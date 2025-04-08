@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generated Resume</title>
+    <style>
+        body { font-family: sans-serif; margin: 20px; line-height: 1.4; }
+        h1, h2, h3 { border-bottom: 1px solid #eee; padding-bottom: 4px; margin-top: 1em; margin-bottom: 0.5em; }
+        h1 { text-align: center; border-bottom: 2px solid #ccc; } 
+        h2 { font-size: 1.2em; color: #333; }
+        h3 { font-size: 1.05em; color: #555; border-bottom: none; margin-bottom: 0.2em; }
+        .section { margin-bottom: 20px; }
+        .contact-info { text-align: center; margin-bottom: 20px; }
+        .contact-info p { margin: 2px 0; }
+        .job, .degree, .certification, .project, .volunteer-item, .affiliation-item, .award-item { margin-bottom: 15px; }
+        ul { padding-left: 20px; margin-top: 5px; }
+        li { margin-bottom: 6px; }
+        .skills-section ul { list-style: none; padding-left: 0; }
+        .skills-section li { display: inline-block; background-color: #f0f0f0; padding: 3px 8px; margin: 3px; border-radius: 4px; font-size: 0.9em; }
+        .skills-category { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <h1><%- generatedSections.contactInfo?.name || 'Resume' %></h1>
+
+    <% if (generatedSections.contactInfo) { %>
+    <div class="section contact-info">
+        <p>
+            <% if (generatedSections.contactInfo.location) { %><span style="margin-right: 10px;"><%- generatedSections.contactInfo.location %></span><% } %>
+            <% if (generatedSections.contactInfo.phone) { %><span style="margin-right: 10px;"> | <%- generatedSections.contactInfo.phone %></span><% } %>
+            <% if (generatedSections.contactInfo.email) { %><span> | <a href="mailto:<%- generatedSections.contactInfo.email %>"><%- generatedSections.contactInfo.email %></a></span><% } %>
+            <% if (generatedSections.contactInfo.linkedin) { %><span> | <a href="<%- generatedSections.contactInfo.linkedin %>" target="_blank">LinkedIn</a></span><% } %>
+            <% /* Add other potential contact links like portfolio here */ %>
+        </p>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.summaryOrObjective) { %>
+    <div class="section">
+        <h2>Summary / Objective</h2>
+        <p><%- generatedSections.summaryOrObjective %></p>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.experience && generatedSections.experience.length > 0) { %>
+    <div class="section">
+        <h2>Professional Experience</h2>
+        <% generatedSections.experience.forEach(job => { %>
+            <div class="job">
+                <h3><%- job.title %></h3>
+                <p style="margin:0; font-style: italic;"><%- job.company %> | <%- job.location %> | <%- job.dates %></p>
+                <% if (job.bullets && job.bullets.length > 0) { %> 
+                <ul>
+                    <% job.bullets.forEach(point => { %>
+                        <li><%- point %></li>
+                    <% }); %>
+                </ul>
+                <% } %>
+            </div>
+        <% }); %>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.skills && Object.keys(generatedSections.skills).length > 0) { %>
+    <div class="section skills-section">
+        <h2>Skills</h2>
+        <% Object.entries(generatedSections.skills).forEach(([category, skillsList]) => { %>
+            <% if (skillsList && skillsList.length > 0) { %>
+                <div class="skills-category">
+                    <h3 style="text-transform: capitalize;"><%- category %></h3>
+                    <ul>
+                        <% skillsList.forEach(skill => { %>
+                            <li><%- skill %></li>
+                        <% }); %>
+                    </ul>
+                </div>
+            <% } %>
+        <% }); %>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.education && generatedSections.education.length > 0) { %>
+    <div class="section">
+        <h2>Education</h2>
+        <% generatedSections.education.forEach(edu => { %>
+            <div class="degree">
+                <h3><%- edu.degree %>, <%- edu.major %></h3>
+                <p style="margin:0;"><%- edu.institution %> - <%- edu.graduationYear %></p>
+                <% if (edu.details) { %><p style="margin:0; font-size: 0.9em;"><%- edu.details %></p><% } %>
+            </div>
+        <% }); %>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.projects && generatedSections.projects.length > 0) { %>
+    <div class="section">
+        <h2>Projects</h2>
+        <% generatedSections.projects.forEach(proj => { %>
+            <div class="project">
+                <h3><%- proj.name %></h3>
+                <p style="margin:0;"><i>Technologies:</i> <%- proj.technologies %></p>
+                <p style="margin:0;"><%- proj.description %></p>
+                <% if (proj.outcome) { %><p style="margin:0;"><i>Outcome:</i> <%- proj.outcome %></p><% } %>
+            </div>
+        <% }); %>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.certifications && generatedSections.certifications.length > 0) { %>
+    <div class="section">
+        <h2>Certifications</h2>
+        <% generatedSections.certifications.forEach(cert => { %>
+            <div class="certification">
+                <p style="margin:0;"><strong><%- cert.name %></strong> - <%- cert.organization %> (<%- cert.date %>)</p>
+            </div>
+        <% }); %>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.awards && generatedSections.awards.length > 0) { %>
+    <div class="section">
+        <h2>Awards and Honors</h2>
+        <ul>
+        <% generatedSections.awards.forEach(award => { %>
+            <li class="award-item"><%- award %></li>
+        <% }); %>
+        </ul>
+    </div>
+    <% } %>
+
+    <% if (generatedSections.volunteerWork && generatedSections.volunteerWork.length > 0) { %>
+    <div class="section">
+        <h2>Volunteer Work</h2>
+        <% generatedSections.volunteerWork.forEach(vol => { %>
+            <div class="volunteer-item">
+                 <h3><%- vol.role %> at <%- vol.organization %></h3>
+                 <p style="margin:0;"><i>Dates:</i> <%- vol.dates %></p>
+                 <p style="margin:0;"><%- vol.description %></p>
+            </div>
+        <% }); %>
+    </div>
+    <% } %>
+
+     <% if (generatedSections.professionalAffiliations && generatedSections.professionalAffiliations.length > 0) { %>
+    <div class="section">
+        <h2>Professional Affiliations</h2>
+         <ul>
+        <% generatedSections.professionalAffiliations.forEach(affil => { %>
+            <li class="affiliation-item"><%- affil %></li>
+        <% }); %>
+        </ul>
+    </div>
+    <% } %>
+
+</body>
+</html>

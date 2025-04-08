@@ -1,0 +1,65 @@
+# .windsurfrules
+# Project-Specific Rules for Windsurf's Cascade AI
+
+## Core Principles
+- Prefer simple, straightforward solutions over complex ones.
+- Avoid code duplication by reusing existing functionality where possible.
+- Keep the codebase clean, organized, and maintainable.
+- Ensure code works across dev, test, and prod environments without hardcoding environment-specific logic.
+
+## Coding Workflow
+- **Focus & Scope**:
+  - Concentrate only on code relevant to the current task.
+  - Avoidascape changes unrelated to the task.
+  - Map and respect dependencies directly affected by changes.
+- **Incremental Development**:
+  - Implement changes in small, testable steps.
+  - Commit frequently with clear, descriptive messages.
+- **Planning**:
+  - Plan changes before coding (mental model or written steps).
+  - Identify and address high-risk areas early.
+
+## Technical Stack
+- **Frontend**:
+  - Use HTML, JavaScript, and Tailwind CSS for UI components.
+  - Follow responsive design principles.
+- **Backend**:
+  - Use Node.js with Express.js (preferred) for RESTful APIs.
+  - Optional: GraphQL for complex data needs.
+- **Database**:
+  - Use Supabase with PostgreSQL (no JSON file storage).
+  - Implement row-level security and connection pooling.
+- **Search**:
+  - Use Elasticsearch hosted on elastic.co with separate dev/prod indexes.
+- **Authentication**:
+  - Use Supabase Authentication with JWT and role-based access control.
+
+## Code Organization
+- Keep files under 200–300 lines; refactor larger files.
+- Avoid one-off scripts in files; prefer reusable code.
+
+## Testing
+- Write comprehensive tests (unit, integration, end-to-end) for all new features and fixes.
+- Target 80%+ coverage for critical business logic.
+- Test edge cases, boundaries, success paths, and error handling.
+- No mocking/stubbing in dev or prod—only in tests.
+
+## Architecture & Change Management
+- Respect existing, proven architectural patterns unless explicitly instructed to change.
+- Only make requested changes or well-understood related fixes.
+- Avoid new patterns/tech for bug fixes unless existing options are exhausted; remove old logic if new patterns are adopted.
+- Never overwrite `.env` files without explicit confirmation.
+
+## Documentation
+- Write self-documenting code with meaningful names.
+- Comment complex logic with "why" (not just "what").
+- Maintain up-to-date READMEs and document APIs, limitations, and edge cases.
+
+## Performance & Security
+- Optimize database/Elasticsearch queries and use pagination/caching.
+- Validate inputs, use HTTPS, parameterized queries, and rate limiting.
+- Follow WCAG 2.1 AA for accessibility and support internationalization.
+
+## Review & Dependencies
+- Self-review code: ensure tests pass, no linting errors, and requirements are met.
+- Minimize dependencies; document and evaluate new ones for security/maintenance.
