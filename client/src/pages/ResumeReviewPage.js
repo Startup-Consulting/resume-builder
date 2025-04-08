@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import axios from 'axios'; // Import axios
+import EditableResume from '../components/EditableResume';
+import '../components/EditableResume.css';
 
 const ResumeReviewPage = () => {
   const location = useLocation();
@@ -11,6 +13,8 @@ const ResumeReviewPage = () => {
   const [generatedHtml, setGeneratedHtml] = useState(location.state?.generatedHtml || '');
   const [originalResumeData, setOriginalResumeData] = useState(location.state?.originalResumeData || null);
   const [jobDescriptionData, setJobDescriptionData] = useState(location.state?.jobDescriptionData || null);
+  const [parsedResumeData, setParsedResumeData] = useState(null);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // State for chat interface
   const [messages, setMessages] = useState([]);
@@ -31,6 +35,126 @@ const ResumeReviewPage = () => {
       // Optionally redirect or show a more prominent error
     }
   }, [generatedHtml, originalResumeData, jobDescriptionData]);
+
+  // Parse resume data from HTML or extract from server response
+  useEffect(() => {
+    if (location.state?.resumeData) {
+      // If we already have structured data from the server
+      console.log('Using resumeData from location state:', location.state.resumeData);
+      setParsedResumeData(location.state.resumeData);
+    } else if (generatedHtml) {
+      // Request the structured data from the server
+      const fetchResumeData = async () => {
+        console.log('Fetching resume data from HTML...');
+        try {
+          const response = await axios.post(`http://localhost:${serverPort}/api/resume/parse`, { 
+            htmlContent: generatedHtml
+          });
+          
+          console.log('Parse response:', response.data);
+          if (response.data && response.data.resumeData) {
+            setParsedResumeData(response.data.resumeData);
+            console.log('Successfully set parsed resume data');
+          } else {
+            console.error('Failed to parse resume data from HTML');
+            createFallbackResumeData();
+          }
+        } catch (error) {
+          console.error('Error fetching parsed resume data:', error);
+          createFallbackResumeData();
+        }
+      };
+      
+      fetchResumeData();
+    }
+  }, [generatedHtml, location.state, serverPort]);
+
+  // Create a basic resume structure from the HTML as fallback
+  const createFallbackResumeData = () => {
+    console.log('Creating fallback resume data structure');
+    
+    // Extract name from HTML if possible
+    const parser = new DOMParser();
+    const htmlDoc = parser.parseFromString(generatedHtml, 'text/html');
+    const name = htmlDoc.querySelector('h1')?.textContent || 'Your Name';
+    
+    // Create a basic structure that matches what EditableResume expects
+    const fallbackData = {
+      contactInfo: {
+        name: name,
+        location: 'Your Location',
+        email: 'your.email@example.com',
+        phone: 'Your Phone',
+        linkedin: 'https://linkedin.com/in/yourprofile'
+      },
+      summaryOrObjective: 'Your professional summary or objective statement.',
+      experience: [
+        {
+          title: 'Job Title',
+          company: 'Company Name',
+          location: 'Location',
+          dates: 'Start Date - End Date',
+          bullets: ['Responsibility or achievement']
+        }
+      ],
+      education: [
+        {
+          degree: 'Degree',
+          major: 'Major',
+          institution: 'Institution Name',
+          graduationYear: 'Year',
+          details: ''
+        }
+      ],
+      skills: {
+        technical: ['Skill 1', 'Skill 2', 'Skill 3'],
+        soft: ['Skill 1', 'Skill 2', 'Skill 3']
+      }
+    };
+    
+    setParsedResumeData(fallbackData);
+  };
+
+  // Toggle edit mode
+  const toggleEditMode = () => {
+    console.log('Toggle edit mode. Current state:', isEditMode, 'Parsed data:', parsedResumeData);
+    
+    // If we don't have parsed data yet, create it before enabling edit mode
+    if (!parsedResumeData && !isEditMode) {
+      createFallbackResumeData();
+    }
+    
+    setIsEditMode(prev => !prev);
+  };
+
+  // Handle save from editable resume
+  const handleSaveResume = async (updatedResumeData) => {
+    try {
+      // Send the updated data to the server to regenerate HTML
+      const response = await axios.post(`http://localhost:${serverPort}/api/resume/update`, {
+        resumeData: updatedResumeData
+      });
+      
+      if (response.data && response.data.updatedHtml) {
+        // Update the HTML and parsed data
+        setGeneratedHtml(response.data.updatedHtml);
+        setParsedResumeData(updatedResumeData);
+        
+        // Exit edit mode
+        setIsEditMode(false);
+        
+        // Add a system message
+        setMessages(prev => [...prev, { sender: 'system', text: 'Resume updated successfully.' }]);
+      } else {
+        throw new Error('Update request did not return updated resume HTML.');
+      }
+    } catch (error) {
+      console.error('Error updating resume:', error);
+      const message = error.response?.data?.message || error.message || 'Failed to update resume.';
+      setChatError(`Error: ${message}`);
+      setMessages(prev => [...prev, { sender: 'system', text: `Error updating resume: ${message}` }]);
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!userInput.trim() || isChatLoading) return;
@@ -169,12 +293,20 @@ const ResumeReviewPage = () => {
              <Link to="/upload" className="btn btn-secondary btn-sm">
                Generate Another
              </Link>
+             {/* Edit Mode Toggle Button */}
+             <button
+               type="button"
+               onClick={toggleEditMode}
+               className={`btn ${isEditMode ? 'btn-warning' : 'btn-secondary'} btn-sm`}
+             >
+               {isEditMode ? 'Cancel Editing' : 'Edit Resume'}
+             </button>
              {/* Download Buttons */}
              <button 
                type="button" 
                onClick={() => handleDownload('pdf')} 
                className="btn btn-primary btn-sm disabled:opacity-50" 
-               disabled={downloadingFormat !== null} // Disable if any download is active
+               disabled={downloadingFormat !== null || isEditMode} // Disable if any download is active or in edit mode
              >
                {downloadingFormat === 'pdf' ? 'Downloading...' : 'Download PDF'} {/* Show loading only for PDF */}
              </button>
@@ -182,7 +314,7 @@ const ResumeReviewPage = () => {
                type="button" 
                onClick={() => handleDownload('docx')} 
                className="btn btn-primary btn-sm disabled:opacity-50" 
-               disabled={downloadingFormat !== null} // Disable if any download is active
+               disabled={downloadingFormat !== null || isEditMode} // Disable if any download is active or in edit mode
              >
                {downloadingFormat === 'docx' ? 'Downloading...' : 'Download DOCX'} {/* Show loading only for DOCX */}
              </button>
@@ -190,17 +322,25 @@ const ResumeReviewPage = () => {
                type="button" 
                onClick={() => handleDownload('md')} 
                className="btn btn-primary btn-sm disabled:opacity-50" 
-               disabled={downloadingFormat !== null} // Disable if any download is active
+               disabled={downloadingFormat !== null || isEditMode} // Disable if any download is active or in edit mode
              >
                {downloadingFormat === 'md' ? 'Downloading...' : 'Download MD'} {/* Show loading only for MD */}
              </button>
           </div>
-          <div 
-            className="prose max-w-none"
-            dangerouslySetInnerHTML={{ __html: generatedHtml }}
-          />
+          {parsedResumeData ? (
+            <EditableResume 
+              resumeData={parsedResumeData}
+              onSave={handleSaveResume}
+              isEditMode={isEditMode}
+            />
+          ) : (
+            <div 
+              className="prose max-w-none"
+              dangerouslySetInnerHTML={{ __html: generatedHtml }}
+            />
+          )}
       </div>
-
+      
       {/* Right Side: Chat Interface */}
       <div className="lg:w-1/3 flex flex-col border border-gray-300 rounded-lg bg-gray-50 shadow-lg h-full">
           <h2 className="text-xl font-semibold text-gray-800 p-3 border-b bg-gray-100 rounded-t-lg text-center">Chat & Refine</h2>

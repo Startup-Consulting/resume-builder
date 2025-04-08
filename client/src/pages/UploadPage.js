@@ -104,7 +104,33 @@ const UploadPage = () => {
         headers: { 'Content-Type': 'application/json' },
       });
       console.log('Resume generation successful.');
-      generatedHtmlResult = generateResponse.data;
+      
+      // Handle the new JSON response format
+      if (generateResponse.data && generateResponse.data.renderedHtml) {
+        console.log('Received structured response with HTML and resume data');
+        generatedHtmlResult = generateResponse.data.renderedHtml;
+        
+        // Store the structured resume data if available
+        const resumeData = generateResponse.data.resumeData;
+        
+        console.log('Redirecting to review page with complete data...');
+        setProcessStatus({ loading: false, error: null, step: '' }); 
+        
+        // Pass original data along with generated HTML and structured resume data
+        navigate('/resume-review', { 
+          state: { 
+            generatedHtml: generatedHtmlResult, 
+            originalResumeData: { extractedText: extractedResumeText }, 
+            jobDescriptionData: { text: currentJobDescription },
+            resumeData: resumeData // Pass the structured resume data for editing
+          } 
+        });
+        return; // Exit early since we've handled navigation
+      } else {
+        // Fall back to the old behavior if we don't get the expected response format
+        console.warn('Received unexpected response format from server');
+        generatedHtmlResult = generateResponse.data;
+      }
       
       console.log('Redirecting to review page...');
       setProcessStatus({ loading: false, error: null, step: '' }); 

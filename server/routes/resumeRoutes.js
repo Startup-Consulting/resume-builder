@@ -15,6 +15,12 @@ router.post('/chat', /* authMiddleware, */ resumeController.handleChat);
 // POST /api/resume/download - Endpoint to download the resume in different formats
 router.post('/download', /* authMiddleware, */ resumeController.downloadResume);
 
+// Parse HTML content into structured resume data
+router.post('/parse', resumeController.parseResumeHtml);
+
+// Update resume with edited data
+router.post('/update', resumeController.updateResume);
+
 // Add other resume-related routes here if needed (e.g., getting templates)
 
 module.exports = router;

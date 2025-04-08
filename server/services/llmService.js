@@ -12,182 +12,199 @@ const genAI = API_KEY ? new GoogleGenerativeAI(API_KEY) : null;
 // Use the specific model requested (ensure compatibility)
 const modelName = "gemini-2.5-pro-preview-03-25"; 
 
-async function generateResumeContent(resumeData, jobDescription, userInstructions) {
-    if (!genAI) {
-        throw new Error("LLM service is not initialized. Check GEMINI_API_KEY.");
-    }
+async function generateResumeContent(resumeData, jobDescription, userInstructions = '') {
+    try {
+        console.log('Generating resume content with LLM...');
+        
+        // Ensure we have the necessary API key
+        const apiKey = process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error('Missing GEMINI_API_KEY environment variable');
+        }
 
-    const model = genAI.getGenerativeModel({ model: modelName });
+        // Validate input data
+        if (!resumeData) {
+            throw new Error('Missing resume data for LLM generation');
+        }
+        
+        if (!jobDescription || !jobDescription.text) {
+            throw new Error('Missing job description for LLM generation');
+        }
+        
+        // Log the structure of the input data for debugging
+        console.log('Resume data structure:', {
+            hasRawText: !!resumeData.rawText || !!resumeData.extractedText,
+            hasName: !!resumeData.name,
+            hasContact: !!resumeData.contact,
+            hasExperience: Array.isArray(resumeData.experience),
+            hasEducation: Array.isArray(resumeData.education),
+            hasSkills: !!resumeData.skills
+        });
 
-    // --- Updated Prompt based on User Guidelines --- 
-    const prompt = `
-        **Objective:**
-        Generate a professional resume tailored to the Target Job Description, using the provided Candidate Profile information. Follow the specified structure and content guidelines strictly. **IMPORTANT: Only include sections for which relevant information exists in the Candidate Profile. If no information is provided for a section (e.g., Education, Certifications), omit that section entirely from the output.**
+        // Initialize the Gemini API client
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-        **Candidate Profile:**
-        This JSON object contains the candidate's raw information, potentially extracted from an uploaded resume or entered manually. Structure might vary, but look for common keys like 'name', 'contact', 'email', 'phone', 'linkedin', 'summary', 'objective', 'experience' (array of jobs with 'title', 'company', 'location', 'dates', 'responsibilities'/'achievements'), 'skills' (array or object), 'education' (array of degrees with 'degree', 'major', 'institution', 'graduationYear', 'gpa'), 'certifications', 'projects', 'awards', 'volunteerWork', 'professionalAffiliations'.
-        \`\`\`json
-        ${JSON.stringify(resumeData, null, 2)} 
-        \`\`\`
-
-        **Target Job Description:**
-        Use this to tailor the content, focusing on keywords and requirements.
-        \`\`\`text
-        ${jobDescription.text || 'No specific job description text provided.'}
-        \`\`\`
-        ${jobDescription.keywords ? `\n**Key Job Keywords:**\n${jobDescription.keywords.join(', ')}` : ''}
-
-        **User Instructions (Optional Overrides):**
-        ${userInstructions || 'Standard tailoring based on job description.'}
-
-        **Resume Generation Task:**
-        Generate the resume content section by section, adhering to the guidelines below. Remember the rule: **No data = No section.**
-
-        1.  **Contact Information:** 
-            *   Include: Full name, phone number, professional email, LinkedIn profile URL (if available), City/State (if available). 
-            *   Format professionally.
-            *   Only include if present in the Candidate Profile.
-
-        2.  **Resume Summary or Objective:**
-            *   Generate a concise (2-3 sentences) summary (for experienced candidates) or objective (for entry-level/career changers) tailored to the Target Job Description.
-            *   Use keywords from the job description.
-            *   Only include if the Candidate Profile contains a summary/objective or enough experience/skills to create one.
-
-        3.  **Professional Experience:**
-            *   List jobs in reverse chronological order.
-            *   Include: Job title, company name, location, dates (Month/Year).
-            *   For each job, write 3-5 bullet points using action verbs and quantifying achievements where possible (STAR method). Integrate job description keywords naturally.
-            *   Only include if the 'experience' array exists and has entries in the Candidate Profile.
-
-        4.  **Skills:**
-            *   List relevant hard and soft skills matching the job requirements.
-            *   Prioritize skills mentioned in the job posting.
-            *   Categorize if appropriate (e.g., Technical Skills, Languages, Tools, Soft Skills).
-            *   Only include if 'skills' information is present in the Candidate Profile.
-
-        5.  **Education:**
-            *   Include: Degree(s), major, institution, graduation year. Optionally GPA (if high), relevant coursework/honors for recent grads.
-            *   Format clearly.
-            *   Only include if 'education' information is present in the Candidate Profile.
-
-        6.  **Optional Sections (Include ONLY if data exists in Candidate Profile AND they add value):**
-            *   **Certifications:** Name, issuing body, date.
-            *   **Projects:** Name, description, tech used, outcome.
-            *   **Awards and Honors:** Recognition, context.
-            *   **Volunteer Work:** Role, organization, dates, contributions.
-            *   **Professional Affiliations:** Membership, role/dates.
-
-        **Output Format:**
-        Provide the response as a single, valid JSON object. Use the following keys for the sections. **Crucially, only include a key-value pair for a section if you generated content for it based on the presence of data in the Candidate Profile.** Do not include keys with null or empty values for omitted sections.
-        \`\`\`json
+        // Construct a detailed prompt for resume generation
+        const prompt = `
+        You are an expert resume writer. Your task is to create a tailored resume based on a candidate's existing resume and a job description.
+        
+        Here is the candidate's resume information:
+        ${JSON.stringify(resumeData, null, 2)}
+        
+        Here is the job description:
+        ${jobDescription.text}
+        
+        IMPORTANT INSTRUCTIONS:
+        1. Create a resume that highlights the candidate's relevant skills and experience for this specific job.
+        2. Use the job description to identify key skills, qualifications, and experiences to emphasize.
+        3. Maintain a professional tone and use action verbs.
+        4. Be concise but comprehensive.
+        5. Do not fabricate information - only use what's provided in the candidate's resume.
+        6. Your response must be in valid JSON format with the following structure:
+        
         {
           "contactInfo": {
-            "name": "<Full Name>",
-            "phone": "User's phone number (e.g., +1 123-456-7890)",
-            "email": "User's email address",
-            "linkedin": "Full LinkedIn profile URL including https:// (e.g., https://www.linkedin.com/in/username)",
-            "portfolio": "Full portfolio/website URL including https:// (if provided)",
-            "location": "<City, State (optional)>"
+            "name": "Candidate's full name",
+            "phone": "Phone number",
+            "email": "Email address",
+            "linkedin": "LinkedIn URL",
+            "portfolio": "Portfolio URL (if applicable)",
+            "location": "City, State"
           },
-          "summaryOrObjective": "<Generated summary or objective text>",
+          "summaryOrObjective": "A compelling professional summary tailored to the job",
           "experience": [
             {
-              "title": "<Job Title>",
-              "company": "<Company Name>",
-              "location": "<Location>",
-              "dates": "<Dates>",
-              "bullets": [
-                "<Bullet point 1>",
-                "<Bullet point 2>"
-              ]
+              "title": "Job Title",
+              "company": "Company Name",
+              "location": "City, State",
+              "dates": "Start Date - End Date",
+              "bullets": ["Achievement 1", "Achievement 2", "Achievement 3"]
             }
-            // ... more job entries
           ],
-          "skills": {
-            "technical": ["<Skill 1>", "<Skill 2>"],
-            "soft": ["<Skill 3>", "<Skill 4>"],
-            // ... other categories if applicable
-            "other": ["<Skill 5>"]
-          },
           "education": [
             {
-              "degree": "<Degree Name>",
-              "major": "<Major>",
-              "institution": "<Institution Name>",
-              "graduationYear": "<Year>",
-              "details": "<Optional: GPA, Honors, Coursework>"
-            }
-            // ... more degrees
-          ],
-          // --- Optional Sections (Only include if data exists) ---
-          "certifications": [
-            {
-              "name": "<Certification Name>",
-              "organization": "<Issuing Body>",
-              "date": "<Date Earned>"
+              "degree": "Degree Name",
+              "major": "Major",
+              "institution": "Institution Name",
+              "graduationYear": "Year",
+              "details": "Additional details (optional)"
             }
           ],
+          "skills": {
+            "technical": ["Skill 1", "Skill 2", "Skill 3"],
+            "soft": ["Skill 1", "Skill 2", "Skill 3"]
+          },
+          "certifications": ["Certification 1", "Certification 2"],
           "projects": [
             {
-              "name": "<Project Name>",
-              "description": "<Description>",
-              "technologies": "<Tech Used>",
-              "outcome": "<Outcome>"
+              "name": "Project Name",
+              "description": "Brief description",
+              "bullets": ["Detail 1", "Detail 2"]
             }
-          ],
-          "awards": [
-            "<Award/Honor 1>",
-            "<Award/Honor 2>"
-          ],
-          "volunteerWork": [
-             {
-              "role": "<Role>",
-              "organization": "<Organization>",
-              "dates": "<Dates>",
-              "description": "<Contributions>"
-            }
-          ],
-          "professionalAffiliations": [
-             "<Affiliation 1>",
-             "<Affiliation 2>"
           ]
         }
-        \`\`\`
+        
+        IMPORTANT: Ensure your response is ONLY the JSON object with no additional text before or after.
+        
+        ${userInstructions ? `Additional instructions: ${userInstructions}` : ''}
+        
+        `;
 
-    `;
-
-    try {
-        console.log(`Sending prompt to Gemini model (${modelName}). Length: ${prompt.length} chars`);
+        // Generate content using the LLM
         const result = await model.generateContent(prompt);
         const response = await result.response;
-
-        // Basic check for response existence
-        if (!response || !response.text) {
-            console.error("Gemini API returned an empty response.");
-            throw new Error("Received no content from the LLM service.");
-        }
-
         const text = response.text();
-        console.log(`Received response from Gemini. Length: ${text.length} chars`);
-
-        // Attempt to parse the JSON response
+        
+        console.log('Raw response from LLM:\n', text);
+        
+        // Extract JSON from the response text
+        let jsonStr = text;
+        
+        // Check if the response is wrapped in markdown code blocks
+        const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+        if (jsonMatch && jsonMatch[1]) {
+            jsonStr = jsonMatch[1];
+            console.log('Extracted JSON from markdown code block');
+        }
+        
+        // Parse the JSON response
         try {
-            // Remove potential leading/trailing markdown code fences/whitespace more robustly
-            const cleanedText = text.trim().replace(/^```json\s*/, '').replace(/\s*```$/, '');
-            const parsedJson = JSON.parse(cleanedText);
-            console.log("Successfully parsed LLM response.");
+            const parsedJson = JSON.parse(jsonStr);
+            console.log('Successfully parsed JSON from LLM response');
+            
+            // Validate the parsed JSON structure
+            if (!parsedJson.contactInfo) {
+                console.warn('Missing contactInfo in LLM response, adding empty object');
+                parsedJson.contactInfo = { name: '', phone: '', email: '', linkedin: '', location: '' };
+            }
+            
+            if (!parsedJson.summaryOrObjective) {
+                console.warn('Missing summaryOrObjective in LLM response, adding empty string');
+                parsedJson.summaryOrObjective = '';
+            }
+            
+            if (!parsedJson.experience || !Array.isArray(parsedJson.experience)) {
+                console.warn('Missing or invalid experience array in LLM response, adding empty array');
+                parsedJson.experience = [];
+            }
+            
+            if (!parsedJson.education || !Array.isArray(parsedJson.education)) {
+                console.warn('Missing or invalid education array in LLM response, adding empty array');
+                parsedJson.education = [];
+            }
+            
+            if (!parsedJson.skills) {
+                console.warn('Missing skills in LLM response, adding empty object');
+                parsedJson.skills = { technical: [], soft: [] };
+            } else if (Array.isArray(parsedJson.skills)) {
+                // Convert skills array to object format
+                console.warn('Skills is an array, converting to object format');
+                const skillsArray = parsedJson.skills;
+                parsedJson.skills = { technical: skillsArray, soft: [] };
+            }
+            
             return parsedJson;
         } catch (parseError) {
-            console.error("Failed to parse LLM response JSON:", parseError);
-            console.error("Raw LLM Response Text:\n---\n", text, "\n---");
-            throw new Error(`Failed to parse the generated content from the LLM. Raw text: ${text.substring(0, 100)}...`); // Include snippet in error
+            console.error('Failed to parse JSON from LLM response:', parseError);
+            
+            // Attempt to extract JSON even if there's text around it
+            const jsonRegex = /\{[\s\S]*\}/;
+            const extractedJson = text.match(jsonRegex);
+            
+            if (extractedJson) {
+                try {
+                    console.log('Attempting to parse extracted JSON portion');
+                    const parsedJson = JSON.parse(extractedJson[0]);
+                    console.log('Successfully parsed extracted JSON portion');
+                    return parsedJson;
+                } catch (secondParseError) {
+                    console.error('Failed to parse extracted JSON portion:', secondParseError);
+                }
+            }
+            
+            // If all parsing attempts fail, return a minimal valid structure
+            console.error('Returning fallback resume structure due to parsing failure');
+            return {
+                contactInfo: { name: '', phone: '', email: '', linkedin: '', location: '' },
+                summaryOrObjective: 'Failed to generate summary from LLM.',
+                experience: [],
+                education: [],
+                skills: { technical: [], soft: [] },
+                certifications: []
+            };
         }
-
     } catch (error) {
-        // Catch API call errors and parsing errors
-        console.error("Error during LLM interaction or parsing:", error);
-        // Rethrow a more generic error for the controller 
-        throw new Error(`LLM service failed: ${error.message}`); 
+        console.error('Error in generateResumeContent:', error);
+        // Return a minimal valid structure instead of throwing
+        return {
+            contactInfo: { name: '', phone: '', email: '', linkedin: '', location: '' },
+            summaryOrObjective: `Error generating resume: ${error.message}`,
+            experience: [],
+            education: [],
+            skills: { technical: [], soft: [] },
+            certifications: []
+        };
     }
 }
 

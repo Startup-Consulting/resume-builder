@@ -8,6 +8,15 @@ exports.generateResume = async (req, res) => {
         // Destructure expected data from the request body
         const { resumeInput, jobDescription, templateId, userInstructions } = req.body;
 
+        console.log("Generate Resume Request:", {
+            resumeInputType: typeof resumeInput,
+            resumeInputKeys: resumeInput ? Object.keys(resumeInput) : 'null',
+            jobDescriptionType: typeof jobDescription,
+            jobDescriptionKeys: jobDescription ? Object.keys(jobDescription) : 'null',
+            templateId,
+            userInstructionsPresent: !!userInstructions
+        });
+
         // --- Input Validation --- 
         if (!resumeInput || !resumeInput.data) {
             return res.status(400).json({ message: 'Missing resume input data.' });
@@ -28,19 +37,88 @@ exports.generateResume = async (req, res) => {
             }
         );
 
+        // Ensure resumeInput.data is properly formatted for the LLM service
+        let formattedResumeData = resumeInput.data;
+        
+        // If resumeInput.data only contains extractedText, create a more structured format
+        if (resumeInput.data.extractedText && Object.keys(resumeInput.data).length === 1) {
+            console.log("Converting simple extractedText to structured format for LLM...");
+            formattedResumeData = {
+                rawText: resumeInput.data.extractedText,
+                // Add basic structure that LLM can work with
+                name: "Extracted from resume",
+                contact: {
+                    email: "Extracted from resume",
+                    phone: "Extracted from resume"
+                },
+                // These empty arrays/objects ensure the LLM has the expected structure
+                experience: [],
+                education: [],
+                skills: []
+            };
+        }
+
         // --- Call LLM Service --- 
         const generatedContent = await llmService.generateResumeContent(
-            resumeInput.data, 
+            formattedResumeData, 
             jobDescription,   
             userInstructions  
         );
 
+        console.log("--- Generated Content from LLM (Before Normalization) ---\n", JSON.stringify(generatedContent, null, 2), "\n---");
+
         // --- Format Output using Template Service --- 
+        // Normalize the generated content to ensure all expected keys exist for the template
+        const normalizedContent = {
+            contactInfo: generatedContent.contactInfo || { name: '', phone: '', email: '', linkedin: '', portfolio: '', location: '' },
+            summaryOrObjective: generatedContent.summaryOrObjective || '',
+            experience: generatedContent.experience || [],
+            skills: generatedContent.skills || { technical: [], soft: [], other: [] },
+            education: generatedContent.education || [],
+            certifications: generatedContent.certifications || [],
+            projects: generatedContent.projects || [],
+            awards: generatedContent.awards || [],
+            volunteerWork: generatedContent.volunteerWork || [],
+            professionalAffiliations: generatedContent.professionalAffiliations || [],
+            // Add any other sections the default.ejs template might expect
+            languages: generatedContent.languages || [],
+            interests: generatedContent.interests || [] 
+        };
+
+        console.log("--- Normalized Content (For Template) ---\n", JSON.stringify(normalizedContent, null, 2), "\n---");
+
+        // Ensure skills is properly formatted as an object with arrays
+        if (normalizedContent.skills && !normalizedContent.skills.technical && !normalizedContent.skills.soft) {
+            // If skills is a flat array, convert it to the expected structure
+            if (Array.isArray(normalizedContent.skills)) {
+                console.log("Converting skills array to structured format...");
+                normalizedContent.skills = {
+                    technical: normalizedContent.skills,
+                    soft: [],
+                    other: []
+                };
+            }
+            // If skills is an object but missing the expected properties
+            else if (typeof normalizedContent.skills === 'object') {
+                console.log("Ensuring skills object has required properties...");
+                normalizedContent.skills.technical = normalizedContent.skills.technical || [];
+                normalizedContent.skills.soft = normalizedContent.skills.soft || [];
+                normalizedContent.skills.other = normalizedContent.skills.other || [];
+            }
+        }
+
         const templateData = { 
-            generatedSections: generatedContent, 
+            generatedSections: normalizedContent, 
             // Add any other data needed by the template here 
             // E.g., candidateName: resumeInput.data.name 
         };
+
+        console.log("Sending data to template service with structure:", {
+            hasGeneratedSections: !!templateData.generatedSections,
+            contactInfoPresent: !!templateData.generatedSections.contactInfo,
+            experienceLength: templateData.generatedSections.experience.length,
+            skillsStructure: typeof templateData.generatedSections.skills
+        });
 
         // Render the HTML using the selected template
         const renderedHtml = await templateService.renderTemplate(selectedTemplate, templateData);
@@ -48,23 +126,20 @@ exports.generateResume = async (req, res) => {
         console.log("Resume generation and templating successful.");
         // Decide response format: send HTML or structured JSON? 
         // Sending HTML directly for now, could also send JSON with HTML embedded
-        res.setHeader('Content-Type', 'text/html'); // Set content type for HTML response
-        res.status(200).send(renderedHtml);
-
-        // Alternatively, send JSON with HTML:
-        // res.status(200).json({
-        //     message: "Resume generated successfully",
-        //     renderedHtml: renderedHtml,
-        //     templateUsed: selectedTemplate
-        // });
+        // Send JSON response with HTML and structured data
+        res.status(200).json({
+            message: "Resume generated successfully",
+            renderedHtml: renderedHtml,
+            templateUsed: selectedTemplate,
+            resumeData: normalizedContent // Include the structured data for potential editing
+        });
 
     } catch (error) {
         console.error('Error in generateResume controller:', error);
-        // Determine status code based on error type if possible
-        const statusCode = error.message.includes('Template') ? 404 : 500;
-        res.status(statusCode).json({ 
+        res.status(500).json({ 
             message: 'Failed to generate resume.', 
             error: error.message, 
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 };
@@ -196,3 +271,225 @@ exports.downloadResume = async (req, res) => {
         });
     }
 };
+
+// Controller function to parse HTML content into structured resume data
+exports.parseResumeHtml = async (req, res) => {
+    try {
+        const { htmlContent } = req.body;
+
+        // --- Input Validation ---
+        if (!htmlContent) {
+            return res.status(400).json({ message: 'Missing HTML content to parse.' });
+        }
+
+        console.log("Parsing HTML content to extract resume data...");
+
+        // Use a service to extract structured data from HTML
+        // This is a simplified implementation - in a real app, you'd use a more robust HTML parser
+        const extractedData = await extractResumeDataFromHtml(htmlContent);
+
+        res.status(200).json({ 
+            message: "Resume HTML parsed successfully.",
+            resumeData: extractedData
+        });
+
+    } catch (error) {
+        console.error('Error in parseResumeHtml controller:', error);
+        res.status(500).json({ 
+            message: 'Failed to parse resume HTML.', 
+            error: error.message, 
+        });
+    }
+};
+
+// Controller function to update resume with edited data
+exports.updateResume = async (req, res) => {
+    try {
+        const { resumeData } = req.body;
+
+        // --- Input Validation ---
+        if (!resumeData) {
+            return res.status(400).json({ message: 'Missing resume data for update.' });
+        }
+
+        console.log("Updating resume with edited data...");
+
+        // Format the data properly for the template service
+        // The template expects data in a specific structure
+        const templateData = {
+            generatedSections: {
+                contactInfo: resumeData.contactInfo || {},
+                summaryOrObjective: resumeData.summaryOrObjective || '',
+                experience: resumeData.experience || [],
+                education: resumeData.education || [],
+                skills: resumeData.skills || {},
+                // Add any other sections that might be in the template
+                certifications: resumeData.certifications || [],
+                projects: resumeData.projects || [],
+                volunteerWork: resumeData.volunteerWork || [],
+                awards: resumeData.awards || [],
+                publications: resumeData.publications || [],
+                languages: resumeData.languages || [],
+                interests: resumeData.interests || []
+            }
+        };
+        const selectedTemplate = 'default.ejs'; // Using default template
+        const updatedHtml = await templateService.renderTemplate(selectedTemplate, templateData);
+
+        res.status(200).json({ 
+            message: "Resume updated successfully.",
+            updatedHtml: updatedHtml
+        });
+
+    } catch (error) {
+        console.error('Error in updateResume controller:', error);
+        res.status(500).json({ 
+            message: 'Failed to update resume.', 
+            error: error.message, 
+        });
+    }
+};
+
+// Helper function to extract resume data from HTML
+// This is a simplified implementation - in a real app, you'd use a more robust HTML parser
+async function extractResumeDataFromHtml(htmlContent) {
+    try {
+        // Create a simple parser using DOM methods
+        const { JSDOM } = require('jsdom');
+        const dom = new JSDOM(htmlContent);
+        const document = dom.window.document;
+        
+        // Extract structured data
+        const resumeData = {
+            contactInfo: {
+                name: document.querySelector('h1')?.textContent || '',
+                location: '',
+                email: '',
+                phone: '',
+                linkedin: ''
+            },
+            summaryOrObjective: '',
+            experience: [],
+            education: [],
+            skills: {}
+        };
+
+        // Extract contact info
+        const contactSection = document.querySelector('.contact-info');
+        if (contactSection) {
+            const contactText = contactSection.textContent;
+            
+            // Simple regex extractions - this is a basic implementation
+            const locationMatch = contactText.match(/^([^|]+)/);
+            if (locationMatch) resumeData.contactInfo.location = locationMatch[1].trim();
+            
+            const phoneMatch = contactText.match(/\|\s*([^|]+\d[^|]*)\s*\|/);
+            if (phoneMatch) resumeData.contactInfo.phone = phoneMatch[1].trim();
+            
+            const emailLink = contactSection.querySelector('a[href^="mailto:"]');
+            if (emailLink) resumeData.contactInfo.email = emailLink.textContent.trim();
+            
+            const linkedinLink = contactSection.querySelector('a[href*="linkedin"]');
+            if (linkedinLink) resumeData.contactInfo.linkedin = linkedinLink.getAttribute('href');
+        }
+
+        // Extract summary
+        const summarySection = Array.from(document.querySelectorAll('.section')).find(section => 
+            section.querySelector('h2')?.textContent === 'Summary / Objective'
+        );
+        if (summarySection) {
+            const summaryParagraph = summarySection.querySelector('p');
+            if (summaryParagraph) resumeData.summaryOrObjective = summaryParagraph.textContent;
+        }
+
+        // Extract experience
+        const experienceSection = Array.from(document.querySelectorAll('.section')).find(section => 
+            section.querySelector('h2')?.textContent === 'Professional Experience'
+        );
+        if (experienceSection) {
+            const jobs = experienceSection.querySelectorAll('.job');
+            jobs.forEach(job => {
+                const title = job.querySelector('h3')?.textContent || '';
+                const details = job.querySelector('p')?.textContent || '';
+                
+                // Parse company, location, dates from the details text
+                let company = '', location = '', dates = '';
+                const detailsParts = details.split('|').map(part => part.trim());
+                if (detailsParts.length >= 3) {
+                    company = detailsParts[0];
+                    location = detailsParts[1];
+                    dates = detailsParts[2];
+                }
+                
+                // Extract bullet points
+                const bullets = Array.from(job.querySelectorAll('li')).map(li => li.textContent);
+                
+                resumeData.experience.push({
+                    title,
+                    company,
+                    location,
+                    dates,
+                    bullets
+                });
+            });
+        }
+
+        // Extract education
+        const educationSection = Array.from(document.querySelectorAll('.section')).find(section => 
+            section.querySelector('h2')?.textContent === 'Education'
+        );
+        if (educationSection) {
+            const degrees = educationSection.querySelectorAll('.degree');
+            degrees.forEach(degree => {
+                const degreeTitle = degree.querySelector('h3')?.textContent || '';
+                const details = degree.querySelector('p')?.textContent || '';
+                
+                // Parse degree and major from the title
+                let degreeType = '', major = '';
+                const titleParts = degreeTitle.split(',').map(part => part.trim());
+                if (titleParts.length >= 2) {
+                    degreeType = titleParts[0];
+                    major = titleParts[1];
+                }
+                
+                // Parse institution and year from details
+                let institution = '', graduationYear = '';
+                const detailsParts = details.split('-').map(part => part.trim());
+                if (detailsParts.length >= 2) {
+                    institution = detailsParts[0];
+                    graduationYear = detailsParts[1];
+                }
+                
+                // Get additional details if present
+                const additionalDetails = degree.querySelectorAll('p')[1]?.textContent || '';
+                
+                resumeData.education.push({
+                    degree: degreeType,
+                    major,
+                    institution,
+                    graduationYear,
+                    details: additionalDetails
+                });
+            });
+        }
+
+        // Extract skills
+        const skillsSection = Array.from(document.querySelectorAll('.section')).find(section => 
+            section.querySelector('h2')?.textContent === 'Skills'
+        );
+        if (skillsSection) {
+            const skillCategories = skillsSection.querySelectorAll('.skills-category');
+            skillCategories.forEach(category => {
+                const categoryName = category.querySelector('h3')?.textContent.toLowerCase() || 'general';
+                const skills = Array.from(category.querySelectorAll('li')).map(li => li.textContent);
+                
+                resumeData.skills[categoryName] = skills;
+            });
+        }
+
+        return resumeData;
+    } catch (error) {
+        console.error('Error extracting resume data from HTML:', error);
+        throw new Error(`Failed to extract resume data: ${error.message}`);
+    }
+}
