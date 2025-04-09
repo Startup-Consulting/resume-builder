@@ -239,6 +239,11 @@ const EditableResume = ({
   const handleSave = () => {
     console.log('EditableResume: handleSave called');
     
+    // Log the current state of education data before validation
+    if (editedData.education && editedData.education.length > 0) {
+      console.log('Education data before save:', JSON.stringify(editedData.education, null, 2));
+    }
+    
     // Validate all fields before saving
     let isValid = true;
     

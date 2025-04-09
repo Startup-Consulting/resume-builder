@@ -14,10 +14,7 @@ const HomePage = () => {
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-4">
           <Link to="/upload" className="btn btn-primary text-center">
-            Tailor Existing Resume
-          </Link>
-          <Link to="/new-resume" className="btn btn-outline text-center">
-            Create New Resume
+            Start Resume Tailoring
           </Link>
         </div>
       </section>

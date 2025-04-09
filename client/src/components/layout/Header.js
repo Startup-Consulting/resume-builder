@@ -17,12 +17,7 @@ const Header = () => {
             </li>
             <li>
               <Link to="/upload" className="hover:text-primary transition-colors">
-                Upload Resume
-              </Link>
-            </li>
-            <li>
-              <Link to="/new-resume" className="hover:text-primary transition-colors">
-                Create New
+                Tailor Resume
               </Link>
             </li>
           </ul>

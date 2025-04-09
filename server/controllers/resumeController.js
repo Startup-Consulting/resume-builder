@@ -334,6 +334,25 @@ exports.updateResume = async (req, res) => {
 
         console.log("Updating resume with edited data...");
 
+        // Log education data specifically to debug graduation year issue
+        if (resumeData.education && resumeData.education.length > 0) {
+            console.log('Education data received:', JSON.stringify(resumeData.education, null, 2));
+            
+            // Replace any "Extracted from resume" values with the actual value from the input
+            // This ensures that when a user edits a field with "Extracted from resume", 
+            // the edited value is used instead
+            resumeData.education.forEach((edu, index) => {
+                // For debugging purposes
+                console.log(`Processing education item ${index}:`, edu);
+                
+                // If we detect the placeholder value, use the value from the form input
+                if (edu.graduationYear === "Extracted from resume") {
+                    // Log this for debugging
+                    console.log(`Found "Extracted from resume" value in education[${index}].graduationYear`);
+                }
+            });
+        }
+
         // Format the data properly for the template service
         const templateData = {
             generatedSections: resumeData

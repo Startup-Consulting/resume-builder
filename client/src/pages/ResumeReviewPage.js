@@ -155,6 +155,11 @@ const ResumeReviewPage = () => {
     try {
       console.log('Saving resume with data:', JSON.stringify(updatedResumeData, null, 2));
       
+      // Log education data specifically to debug graduation year issue
+      if (updatedResumeData.education && updatedResumeData.education.length > 0) {
+        console.log('Education data being saved:', JSON.stringify(updatedResumeData.education, null, 2));
+      }
+      
       // Update local state immediately to reflect changes in the UI
       setParsedResumeData({...updatedResumeData});
       
@@ -361,9 +366,6 @@ const ResumeReviewPage = () => {
           <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Resume Preview</h2>
           <p className="text-gray-700 mb-4 text-center">This is a preview of your generated resume. Ask questions or modify it in the chat. When you're ready, type /rebuild in the chat to finalize. You can also download it as a PDF, DOCX, or Markdown file below.</p>
            <div className="text-center mb-4 space-x-2"> {/* Reduced space */} 
-             <Link to="/upload" className="btn btn-secondary btn-sm">
-               Generate Another
-             </Link>
              {/* Edit Mode Toggle Button */}
              <button
                type="button"

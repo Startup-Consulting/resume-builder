@@ -84,8 +84,8 @@
         <h2>Education</h2>
         <% generatedSections.education.forEach(edu => { %>
             <div class="degree">
-                <h3><%- edu.degree %>, <%- edu.major %></h3>
-                <p style="margin:0;"><%- edu.institution %> - <%- edu.graduationYear %></p>
+                <h3><%- edu.degree %><% if (edu.major) { %>, <%- edu.major %><% } %></h3>
+                <p style="margin:0;"><%- edu.institution %><% if (edu.graduationYear && edu.graduationYear !== "Extracted from resume") { %> - <%- edu.graduationYear %><% } %></p>
                 <% if (edu.details) { %><p style="margin:0; font-size: 0.9em;"><%- edu.details %></p><% } %>
             </div>
         <% }); %>
