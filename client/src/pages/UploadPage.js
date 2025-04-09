@@ -56,7 +56,8 @@ const UploadPage = () => {
         console.log('Step 0: Fetching job description from URL...');
         setProcessStatus({ loading: true, error: null, step: 'fetching' });
         try {
-          const fetchResponse = await axios.post(`http://localhost:${serverPort}/api/job-description/fetch-from-url`, { jobUrl });
+          // Use relative URL instead of hardcoded localhost
+          const fetchResponse = await axios.post(`/api/job-description/fetch-from-url`, { jobUrl });
           if (fetchResponse.data && fetchResponse.data.extractedDescription) {
             currentJobDescription = fetchResponse.data.extractedDescription;
             setJobDescription(currentJobDescription); 
@@ -65,7 +66,12 @@ const UploadPage = () => {
             throw new Error('Could not extract description from the URL. Please paste it manually.');
           }
         } catch(fetchError) {
-          throw new Error(`Failed to fetch job description: ${fetchError.response?.data?.message || fetchError.message}`);
+          console.error('Job description fetch error details:', fetchError);
+          if (fetchError.message.includes('Network Error')) {
+            throw new Error('Failed to fetch job description: Network Error. Please check your internet connection or paste the job description manually.');
+          } else {
+            throw new Error(`Failed to fetch job description: ${fetchError.response?.data?.message || fetchError.message}`);
+          }
         }
       } else if (!currentJobDescription) {
           throw new Error('Job description is missing.');
@@ -76,7 +82,8 @@ const UploadPage = () => {
       const formData = new FormData();
       formData.append('resumeFile', resumeFile);
       
-      const uploadResponse = await axios.post(`http://localhost:${serverPort}/api/upload/resume`, formData, {
+      // Use relative URL instead of hardcoded localhost
+      const uploadResponse = await axios.post(`/api/upload/resume`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       console.log('Upload successful:', uploadResponse.data);
@@ -100,7 +107,8 @@ const UploadPage = () => {
         userInstructions: '' 
       };
 
-      const generateResponse = await axios.post(`http://localhost:${serverPort}/api/resume/generate`, generatePayload, {
+      // Use relative URL instead of hardcoded localhost
+      const generateResponse = await axios.post(`/api/resume/generate`, generatePayload, {
         headers: { 'Content-Type': 'application/json' },
       });
       console.log('Resume generation successful.');

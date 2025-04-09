@@ -47,7 +47,7 @@ const ResumeReviewPage = () => {
       const fetchResumeData = async () => {
         console.log('Fetching resume data from HTML...');
         try {
-          const response = await axios.post(`http://localhost:${serverPort}/api/resume/parse`, { 
+          const response = await axios.post(`/api/resume/parse`, { 
             htmlContent: generatedHtml
           });
           
@@ -67,7 +67,7 @@ const ResumeReviewPage = () => {
       
       fetchResumeData();
     }
-  }, [generatedHtml, location.state, serverPort]);
+  }, [generatedHtml, location.state]);
 
   // Create a basic resume structure from the HTML as fallback
   const createFallbackResumeData = () => {
@@ -106,6 +106,13 @@ const ResumeReviewPage = () => {
           details: ''
         }
       ],
+      projects: [
+        {
+          name: 'Project Name',
+          description: 'Brief description of the project',
+          bullets: ['Key feature or achievement']
+        }
+      ],
       skills: {
         technical: ['Skill 1', 'Skill 2', 'Skill 3'],
         soft: ['Skill 1', 'Skill 2', 'Skill 3']
@@ -122,29 +129,66 @@ const ResumeReviewPage = () => {
     // If we don't have parsed data yet, create it before enabling edit mode
     if (!parsedResumeData && !isEditMode) {
       createFallbackResumeData();
+    } else if (isEditMode && generatedHtml) {
+      // When exiting edit mode, make sure we have the latest data
+      // This ensures we don't lose changes when toggling back to edit mode
+      (async () => {
+        try {
+          const response = await axios.post(`/api/resume/parse`, { 
+            htmlContent: generatedHtml
+          });
+          
+          if (response.data && response.data.resumeData) {
+            setParsedResumeData(response.data.resumeData);
+          }
+        } catch (error) {
+          console.error('Error fetching parsed resume data:', error);
+        }
+      })();
     }
     
-    setIsEditMode(prev => !prev);
+    setIsEditMode((prevEditMode) => !prevEditMode);
   };
 
   // Handle save from editable resume
   const handleSaveResume = async (updatedResumeData) => {
     try {
+      console.log('Saving resume with data:', JSON.stringify(updatedResumeData, null, 2));
+      
+      // Update local state immediately to reflect changes in the UI
+      setParsedResumeData({...updatedResumeData});
+      
+      // Ensure we have a valid structure before sending to server
+      const validatedData = {
+        ...updatedResumeData,
+        contactInfo: updatedResumeData.contactInfo || {},
+        summaryOrObjective: updatedResumeData.summaryOrObjective || '',
+        experience: updatedResumeData.experience || [],
+        education: updatedResumeData.education || [],
+        projects: updatedResumeData.projects || [],
+        skills: updatedResumeData.skills || {}
+      };
+      
       // Send the updated data to the server to regenerate HTML
-      const response = await axios.post(`http://localhost:${serverPort}/api/resume/update`, {
-        resumeData: updatedResumeData
+      const response = await axios.post(`/api/resume/update`, {
+        resumeData: validatedData
       });
       
+      console.log('Server response:', response.data);
+      
       if (response.data && response.data.updatedHtml) {
-        // Update the HTML and parsed data
+        // Update the HTML with the server response
         setGeneratedHtml(response.data.updatedHtml);
-        setParsedResumeData(updatedResumeData);
         
         // Exit edit mode
         setIsEditMode(false);
         
         // Add a system message
-        setMessages(prev => [...prev, { sender: 'system', text: 'Resume updated successfully.' }]);
+        setMessages((prevMessages) => [...prevMessages, { 
+          sender: 'system', 
+          text: 'Resume updated successfully.',
+          timestamp: new Date().toISOString() // Add timestamp to ensure message is unique
+        }]);
       } else {
         throw new Error('Update request did not return updated resume HTML.');
       }
@@ -152,15 +196,20 @@ const ResumeReviewPage = () => {
       console.error('Error updating resume:', error);
       const message = error.response?.data?.message || error.message || 'Failed to update resume.';
       setChatError(`Error: ${message}`);
-      setMessages(prev => [...prev, { sender: 'system', text: `Error updating resume: ${message}` }]);
+      setMessages((prevMessages) => [...prevMessages, { 
+        sender: 'system', 
+        text: `Error updating resume: ${message}`,
+        timestamp: new Date().toISOString() // Add timestamp to ensure message is unique
+      }]);
     }
   };
 
+  // Handle send message
   const handleSendMessage = async () => {
     if (!userInput.trim() || isChatLoading) return;
 
     const newUserMessage = { sender: 'user', text: userInput };
-    setMessages(prev => [...prev, newUserMessage]);
+    setMessages((prevMessages) => [...prevMessages, newUserMessage]);
     setUserInput('');
     setIsChatLoading(true);
     setChatError(null);
@@ -169,7 +218,7 @@ const ResumeReviewPage = () => {
     const requestType = isRebuild ? 'rebuild' : 'chat';
 
     try {
-      const response = await axios.post(`http://localhost:${serverPort}/api/resume/chat`, { 
+      const response = await axios.post(`/api/resume/chat`, { 
         type: requestType,
         chatHistory: messages, // Send previous messages for context
         currentMessage: isRebuild ? null : newUserMessage.text, // Send current message only if it's not /rebuild
@@ -181,14 +230,14 @@ const ResumeReviewPage = () => {
         // Rebuild returns new HTML content
         if (response.data && response.data.updatedHtml) {
           setGeneratedHtml(response.data.updatedHtml);
-          setMessages(prev => [...prev, { sender: 'system', text: 'Resume rebuilt based on feedback.' }]);
+          setMessages((prevMessages) => [...prevMessages, { sender: 'system', text: 'Resume rebuilt based on feedback.' }]);
         } else {
            throw new Error('Rebuild request did not return updated resume HTML.');
         }
       } else {
         // Chat returns an AI response text
         if (response.data && response.data.response) {
-           setMessages(prev => [...prev, { sender: 'ai', text: response.data.response }]);
+           setMessages((prevMessages) => [...prevMessages, { sender: 'ai', text: response.data.response }]);
         } else {
            throw new Error('Chat request did not return a valid response.');
         }
@@ -196,10 +245,12 @@ const ResumeReviewPage = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
-      const message = error.response?.data?.message || error.message || 'Failed to communicate with the server.';
+      const message = error.response?.data ? 
+                      (await error.response.data.text() || `Failed to download ${downloadingFormat}. Server error.`) : // Try to read blob error
+                      error.message || `Failed to download ${downloadingFormat}.`;
       setChatError(`Error: ${message}`);
       // Optionally add error message to chat
-      setMessages(prev => [...prev, { sender: 'system', text: `Error processing request: ${message}` }]);
+      // setMessages((prevMessages) => [...prevMessages, { sender: 'system', text: `Error downloading ${downloadingFormat}: ${message}` }]);
     } finally {
       setIsChatLoading(false);
     }
@@ -213,11 +264,18 @@ const ResumeReviewPage = () => {
 
     try {
       console.log(`Requesting download as ${format}...`);
+      
+      // Get applicant name and job position for filename
+      const applicantName = parsedResumeData?.contactInfo?.name || 'Resume';
+      const jobPosition = jobDescriptionData?.title || '';
+      
       const response = await axios.post(
-        `http://localhost:${serverPort}/api/resume/download`,
+        `/api/resume/download`,
         { 
           htmlContent: generatedHtml, // Send the HTML content from state
-          format: format 
+          format: format,
+          applicantName: applicantName,
+          jobPosition: jobPosition
         },
         {
           responseType: 'blob', // Important for handling file downloads
@@ -231,15 +289,25 @@ const ResumeReviewPage = () => {
       const link = document.createElement('a');
       link.href = window.URL.createObjectURL(blob);
       
-      // Extract filename from Content-Disposition header if available, otherwise create default
-      const contentDisposition = response.headers['content-disposition'];
-      let filename = `resume.${format}`;
-       if (format === 'docx') filename = 'resume.docx'; // Ensure correct extension for docx
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
-        if (filenameMatch.length === 2) filename = filenameMatch[1];
+      // Create filename with applicant name and job position
+      let filename = `${applicantName.replace(/\s+/g, '_')}`;
+      if (jobPosition) {
+        filename += `-${jobPosition.replace(/\s+/g, '_')}`;
       }
-
+      
+      // Add the correct extension without any underscores before it
+      if (format === 'docx') {
+        filename += '.docx';
+      } else if (format === 'pdf') {
+        filename += '.pdf';
+      } else if (format === 'md') {
+        filename += '.md';
+      }
+      
+      // Remove any trailing underscores before the extension
+      filename = filename.replace(/_\.(pdf|docx|md)$/, '.$1');
+      
+      // Use the filename directly instead of trying to extract it from Content-Disposition
       link.download = filename;
 
       // Append link to the body, click it, and then remove it
@@ -252,16 +320,19 @@ const ResumeReviewPage = () => {
 
       console.log(`Successfully downloaded ${filename}`);
       // Optionally add a system message to chat confirming download
-      // setMessages(prev => [...prev, { sender: 'system', text: `Downloaded ${filename}` }]);
+      setMessages((prevMessages) => [...prevMessages, { sender: 'system', text: `Downloaded ${filename}` }]);
 
     } catch (error) {
-      console.error(`Error downloading resume as ${format}:`, error);
+      console.error(`Error downloading resume as ${downloadingFormat}:`, error);
       const message = error.response?.data ? 
-                      (await error.response.data.text() || `Failed to download ${format}. Server error.`) : // Try to read blob error
-                      error.message || `Failed to download ${format}.`;
+                      (await error.response.data.text() || `Failed to download ${downloadingFormat}. Server error.`) : // Try to read blob error
+                      error.message || `Failed to download ${downloadingFormat}.`;
       setChatError(`Download Error: ${message}`);
-      // Optionally add error message to chat
-      // setMessages(prev => [...prev, { sender: 'system', text: `Error downloading ${format}: ${message}` }]);
+      setMessages((prevMessages) => [...prevMessages, { 
+        sender: 'system', 
+        text: `Error downloading ${downloadingFormat}: ${message}`,
+        timestamp: new Date().toISOString()
+      }]);
     } finally {
       setDownloadingFormat(null); // Clear downloading format
     }

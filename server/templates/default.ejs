@@ -98,9 +98,14 @@
         <% generatedSections.projects.forEach(proj => { %>
             <div class="project">
                 <h3><%- proj.name %></h3>
-                <p style="margin:0;"><i>Technologies:</i> <%- proj.technologies %></p>
                 <p style="margin:0;"><%- proj.description %></p>
-                <% if (proj.outcome) { %><p style="margin:0;"><i>Outcome:</i> <%- proj.outcome %></p><% } %>
+                <% if (proj.bullets && proj.bullets.length > 0) { %>
+                <ul>
+                    <% proj.bullets.forEach(point => { %>
+                        <li><%- point %></li>
+                    <% }); %>
+                </ul>
+                <% } %>
             </div>
         <% }); %>
     </div>

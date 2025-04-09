@@ -20,97 +20,183 @@ const EditableResume = ({
 
   // Handle text changes for simple fields
   const handleTextChange = (section, field, value) => {
-    setEditedData(prev => ({
-      ...prev,
-      [section]: field ? { ...prev[section], [field]: value } : value
-    }));
+    // Create a new object to ensure React detects the state change
+    const newData = {...editedData};
     
+    if (field) {
+      // For nested fields like contactInfo.phone
+      if (!newData[section]) {
+        newData[section] = {};
+      }
+      newData[section][field] = value;
+    } else {
+      // For direct fields like summaryOrObjective
+      newData[section] = value;
+    }
+    
+    // Update state with the new object
+    setEditedData(newData);
     setHasChanges(true);
+    
     // Basic validation
     validateField(section, field, value);
   };
 
   // Handle changes for nested array items
   const handleArrayItemChange = (section, index, field, value) => {
-    setEditedData(prev => {
-      const newArray = [...prev[section]];
-      newArray[index] = { ...newArray[index], [field]: value };
-      return { ...prev, [section]: newArray };
-    });
-    setHasChanges(true);
-  };
-
-  // Handle changes for bullets in experience section
-  const handleBulletChange = (jobIndex, bulletIndex, value) => {
-    setEditedData(prev => {
-      const newExperience = [...prev.experience];
-      const newBullets = [...newExperience[jobIndex].bullets];
-      newBullets[bulletIndex] = value;
-      newExperience[jobIndex] = { ...newExperience[jobIndex], bullets: newBullets };
-      return { ...prev, experience: newExperience };
-    });
-    setHasChanges(true);
-  };
-
-  // Add a new bullet point to a job
-  const addBullet = (jobIndex) => {
-    setEditedData(prev => {
-      const newExperience = [...prev.experience];
-      const newBullets = [...(newExperience[jobIndex].bullets || []), ""];
-      newExperience[jobIndex] = { ...newExperience[jobIndex], bullets: newBullets };
-      return { ...prev, experience: newExperience };
-    });
-    setHasChanges(true);
-  };
-
-  // Remove a bullet point from a job
-  const removeBullet = (jobIndex, bulletIndex) => {
-    setEditedData(prev => {
-      const newExperience = [...prev.experience];
-      const newBullets = [...newExperience[jobIndex].bullets];
-      newBullets.splice(bulletIndex, 1);
-      newExperience[jobIndex] = { ...newExperience[jobIndex], bullets: newBullets };
-      return { ...prev, experience: newExperience };
-    });
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the section exists
+    if (!newData[section]) {
+      newData[section] = [];
+    }
+    
+    // Ensure the item at this index exists
+    if (!newData[section][index]) {
+      newData[section][index] = {};
+    }
+    
+    // Update the specific field
+    newData[section][index][field] = value;
+    
+    // Update the state with the new object
+    setEditedData(newData);
     setHasChanges(true);
   };
 
   // Add a new item to an array section (experience, education, etc.)
   const addArrayItem = (section, template) => {
-    setEditedData(prev => ({
-      ...prev,
-      [section]: [...(prev[section] || []), template]
-    }));
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the section exists
+    if (!newData[section]) {
+      newData[section] = [];
+    }
+    
+    // Add the new item
+    newData[section].push(template);
+    
+    // Update the state with the new object
+    setEditedData(newData);
     setHasChanges(true);
   };
 
   // Remove an item from an array section
   const removeArrayItem = (section, index) => {
-    setEditedData(prev => ({
-      ...prev,
-      [section]: prev[section].filter((_, i) => i !== index)
-    }));
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the section exists
+    if (!newData[section] || !Array.isArray(newData[section])) {
+      return; // Nothing to remove
+    }
+    
+    // Remove the item at the specified index
+    newData[section].splice(index, 1);
+    
+    // Update the state with the new object
+    setEditedData(newData);
     setHasChanges(true);
   };
 
   // Move an item up or down in an array section
   const moveArrayItem = (section, index, direction) => {
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the section exists
+    if (!newData[section] || !Array.isArray(newData[section])) {
+      return; // Nothing to move
+    }
+    
+    // Check if move is valid
     if (
       (direction === 'up' && index === 0) || 
-      (direction === 'down' && index === editedData[section].length - 1)
+      (direction === 'down' && index === newData[section].length - 1)
     ) {
       return; // Can't move further
     }
 
     const newIndex = direction === 'up' ? index - 1 : index + 1;
     
-    setEditedData(prev => {
-      const newArray = [...prev[section]];
-      const item = newArray[index];
-      newArray.splice(index, 1);
-      newArray.splice(newIndex, 0, item);
-      return { ...prev, [section]: newArray };
-    });
+    // Swap the items
+    const temp = newData[section][index];
+    newData[section][index] = newData[section][newIndex];
+    newData[section][newIndex] = temp;
+    
+    // Update the state with the new object
+    setEditedData(newData);
+    setHasChanges(true);
+  };
+
+  // Handle changes for bullets in experience section
+  const handleBulletChange = (jobIndex, bulletIndex, value) => {
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the experience section and job exist
+    if (!newData.experience || !newData.experience[jobIndex]) {
+      return;
+    }
+    
+    // Ensure bullets array exists
+    if (!newData.experience[jobIndex].bullets) {
+      newData.experience[jobIndex].bullets = [];
+    }
+    
+    // Update the specific bullet
+    newData.experience[jobIndex].bullets[bulletIndex] = value;
+    
+    // Update the state with the new object
+    setEditedData(newData);
+    setHasChanges(true);
+  };
+
+  // Add a new bullet point to a job
+  const addBullet = (jobIndex) => {
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the experience section and job exist
+    if (!newData.experience || !newData.experience[jobIndex]) {
+      return;
+    }
+    
+    // Ensure bullets array exists
+    if (!newData.experience[jobIndex].bullets) {
+      newData.experience[jobIndex].bullets = [];
+    }
+    
+    // Add a new empty bullet
+    newData.experience[jobIndex].bullets.push("");
+    
+    // Update the state with the new object
+    setEditedData(newData);
+    setHasChanges(true);
+  };
+
+  // Remove a bullet point from a job
+  const removeBullet = (jobIndex, bulletIndex) => {
+    // Create a deep copy of the current state
+    const newData = JSON.parse(JSON.stringify(editedData));
+    
+    // Ensure the experience section, job, and bullets exist
+    if (
+      !newData.experience || 
+      !newData.experience[jobIndex] || 
+      !newData.experience[jobIndex].bullets ||
+      !Array.isArray(newData.experience[jobIndex].bullets)
+    ) {
+      return;
+    }
+    
+    // Remove the bullet at the specified index
+    newData.experience[jobIndex].bullets.splice(bulletIndex, 1);
+    
+    // Update the state with the new object
+    setEditedData(newData);
     setHasChanges(true);
   };
 
@@ -119,8 +205,11 @@ const EditableResume = ({
     const key = field ? `${section}.${field}` : section;
     let error = null;
 
+    // Handle undefined or null values
+    const actualValue = value === undefined || value === null ? '' : value;
+
     // Check for required fields
-    if (value === '') {
+    if (actualValue === '') {
       if (
         (section === 'contactInfo' && ['name', 'email'].includes(field)) ||
         (section === 'summaryOrObjective')
@@ -130,9 +219,9 @@ const EditableResume = ({
     }
 
     // Email validation
-    if (section === 'contactInfo' && field === 'email' && value) {
+    if (section === 'contactInfo' && field === 'email' && actualValue) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(value)) {
+      if (!emailRegex.test(actualValue)) {
         error = 'Please enter a valid email address';
       }
     }
@@ -148,8 +237,16 @@ const EditableResume = ({
 
   // Save changes
   const handleSave = () => {
+    console.log('EditableResume: handleSave called');
+    
     // Validate all fields before saving
     let isValid = true;
+    
+    // Ensure contactInfo exists
+    if (!editedData.contactInfo) {
+      editedData.contactInfo = {};
+      isValid = false;
+    }
     
     // Validate contact info
     ['name', 'email'].forEach(field => {
@@ -164,8 +261,17 @@ const EditableResume = ({
     }
     
     if (isValid) {
-      onSave(editedData);
+      console.log('EditableResume: Validation passed, saving data');
+      
+      // Create a deep copy of the data to prevent reference issues
+      const dataCopy = JSON.parse(JSON.stringify(editedData));
+      
+      // Pass the deep copy to the parent component
+      onSave(dataCopy);
       setHasChanges(false);
+    } else {
+      console.error('EditableResume: Validation failed, not saving');
+      alert('Please fix the validation errors before saving.');
     }
   };
 
@@ -450,6 +556,109 @@ const EditableResume = ({
     );
   };
 
+  // Render editable projects section
+  const renderProjects = () => {
+    if (!editedData.projects || editedData.projects.length === 0) return null;
+
+    return (
+      <div className="section">
+        <h2>Projects</h2>
+        {isEditMode && (
+          <button 
+            className="add-button"
+            onClick={() => addArrayItem('projects', {
+              name: 'Project Name',
+              description: 'Project Description',
+              bullets: ['Key feature or achievement']
+            })}
+          >
+            + Add Project
+          </button>
+        )}
+        {editedData.projects.map((project, projectIndex) => (
+          <div key={projectIndex} className="item">
+            {isEditMode ? (
+              <div className="edit-section">
+                <div className="form-group">
+                  <label>Project Name:</label>
+                  <input
+                    type="text"
+                    value={project.name || ''}
+                    onChange={(e) => handleArrayItemChange('projects', projectIndex, 'name', e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Description:</label>
+                  <textarea
+                    value={project.description || ''}
+                    onChange={(e) => handleArrayItemChange('projects', projectIndex, 'description', e.target.value)}
+                    rows="3"
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Key Points:</label>
+                  {project.bullets && project.bullets.map((bullet, bulletIndex) => (
+                    <div key={bulletIndex} className="bullet-edit">
+                      <textarea
+                        value={bullet}
+                        onChange={(e) => {
+                          const newData = JSON.parse(JSON.stringify(editedData));
+                          if (!newData.projects[projectIndex].bullets) {
+                            newData.projects[projectIndex].bullets = [];
+                          }
+                          newData.projects[projectIndex].bullets[bulletIndex] = e.target.value;
+                          setEditedData(newData);
+                          setHasChanges(true);
+                        }}
+                        rows="2"
+                      />
+                      <button onClick={() => {
+                        const newData = JSON.parse(JSON.stringify(editedData));
+                        newData.projects[projectIndex].bullets.splice(bulletIndex, 1);
+                        setEditedData(newData);
+                        setHasChanges(true);
+                      }}>Remove</button>
+                    </div>
+                  ))}
+                  <button onClick={() => {
+                    const newData = JSON.parse(JSON.stringify(editedData));
+                    if (!newData.projects[projectIndex].bullets) {
+                      newData.projects[projectIndex].bullets = [];
+                    }
+                    newData.projects[projectIndex].bullets.push('');
+                    setEditedData(newData);
+                    setHasChanges(true);
+                  }}>+ Add Key Point</button>
+                </div>
+                <div className="item-actions">
+                  {projectIndex > 0 && (
+                    <button onClick={() => moveArrayItem('projects', projectIndex, 'up')}>Move Up</button>
+                  )}
+                  {projectIndex < editedData.projects.length - 1 && (
+                    <button onClick={() => moveArrayItem('projects', projectIndex, 'down')}>Move Down</button>
+                  )}
+                  <button onClick={() => removeArrayItem('projects', projectIndex)}>Remove Project</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3>{project.name}</h3>
+                <p style={{margin: '5px 0'}}>{project.description}</p>
+                {project.bullets && project.bullets.length > 0 && (
+                  <ul>
+                    {project.bullets.map((point, index) => (
+                      <li key={index}>{point}</li>
+                    ))}
+                  </ul>
+                )}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
   // Render editable skills section
   const renderSkills = () => {
     if (!editedData.skills || Object.keys(editedData.skills).length === 0) return null;
@@ -535,6 +744,7 @@ const EditableResume = ({
       {renderSummary()}
       {renderExperience()}
       {renderEducation()}
+      {renderProjects()}
       {renderSkills()}
       
       {isEditMode && (

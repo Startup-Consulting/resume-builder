@@ -43,7 +43,7 @@ async function generateResumeContent(resumeData, jobDescription, userInstruction
 
         // Initialize the Gemini API client
         const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        const model = genAI.getGenerativeModel({ model: modelName });
 
         // Construct a detailed prompt for resume generation
         const prompt = `

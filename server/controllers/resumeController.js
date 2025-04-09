@@ -223,7 +223,7 @@ exports.handleChat = async (req, res) => {
 // Controller function to handle resume download requests
 exports.downloadResume = async (req, res) => {
     try {
-        const { htmlContent, format } = req.body; // format: 'pdf', 'docx', 'md'
+        const { htmlContent, format, applicantName, jobPosition } = req.body; // format: 'pdf', 'docx', 'md'
 
         // --- Input Validation ---
         if (!htmlContent) {
@@ -235,9 +235,26 @@ exports.downloadResume = async (req, res) => {
 
         console.log(`Handling download request for format: ${format}`);
 
+        // Create filename with applicant name and job position
+        const sanitizedName = (applicantName || 'Resume').replace(/\s+/g, '_');
+        const sanitizedPosition = (jobPosition || '').replace(/\s+/g, '_');
+        
+        let fileName = sanitizedName;
+        if (sanitizedPosition) {
+            fileName += `-${sanitizedPosition}`;
+        }
+        fileName += `.${format}`;
+        
+        // Ensure correct extension for docx
+        if (format === 'docx') {
+            fileName = fileName.replace(/\.docx$|\.md$|\.pdf$/, '.docx');
+        }
+        
+        // Remove any trailing underscores before the extension
+        fileName = fileName.replace(/_\.(pdf|docx|md)$/, '.$1');
+        
         let fileBuffer;
         let contentType;
-        let fileName = `resume.${format}`;
 
         switch (format) {
             case 'pdf':
@@ -247,7 +264,6 @@ exports.downloadResume = async (req, res) => {
             case 'docx':
                 fileBuffer = await downloadService.convertHtmlToDocx(htmlContent);
                 contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-                fileName = 'resume.docx'; // Ensure correct extension
                 break;
             case 'md':
                 fileBuffer = await downloadService.convertHtmlToMarkdown(htmlContent);
@@ -258,8 +274,12 @@ exports.downloadResume = async (req, res) => {
                 return res.status(400).json({ message: 'Unsupported format.' }); 
         }
 
-        console.log(`Sending ${format} file to client.`);
-        res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+        console.log(`Sending ${format} file to client with filename: ${fileName}`);
+        // Use RFC 5987 encoding for the filename to handle special characters properly
+        // Remove any characters that aren't allowed in HTTP headers
+        const safeFileName = fileName.replace(/[^\x20-\x7E]/g, '_');
+        const encodedFilename = encodeURIComponent(fileName).replace(/['()]/g, escape);
+        res.setHeader('Content-Disposition', `attachment; filename="${safeFileName}"; filename*=UTF-8''${encodedFilename}`);
         res.setHeader('Content-Type', contentType);
         res.send(fileBuffer);
 
@@ -315,27 +335,13 @@ exports.updateResume = async (req, res) => {
         console.log("Updating resume with edited data...");
 
         // Format the data properly for the template service
-        // The template expects data in a specific structure
         const templateData = {
-            generatedSections: {
-                contactInfo: resumeData.contactInfo || {},
-                summaryOrObjective: resumeData.summaryOrObjective || '',
-                experience: resumeData.experience || [],
-                education: resumeData.education || [],
-                skills: resumeData.skills || {},
-                // Add any other sections that might be in the template
-                certifications: resumeData.certifications || [],
-                projects: resumeData.projects || [],
-                volunteerWork: resumeData.volunteerWork || [],
-                awards: resumeData.awards || [],
-                publications: resumeData.publications || [],
-                languages: resumeData.languages || [],
-                interests: resumeData.interests || []
-            }
+            generatedSections: resumeData
         };
+        
         const selectedTemplate = 'default.ejs'; // Using default template
         const updatedHtml = await templateService.renderTemplate(selectedTemplate, templateData);
-
+        
         res.status(200).json({ 
             message: "Resume updated successfully.",
             updatedHtml: updatedHtml
@@ -383,8 +389,21 @@ async function extractResumeDataFromHtml(htmlContent) {
             const locationMatch = contactText.match(/^([^|]+)/);
             if (locationMatch) resumeData.contactInfo.location = locationMatch[1].trim();
             
-            const phoneMatch = contactText.match(/\|\s*([^|]+\d[^|]*)\s*\|/);
-            if (phoneMatch) resumeData.contactInfo.phone = phoneMatch[1].trim();
+            // Improved phone number extraction - look for phone pattern more carefully
+            // First, try to find a pattern that looks like a phone number
+            const phonePattern = /\|\s*([0-9()\s\-+.]{7,})\s*\|/;
+            const phoneMatch = contactText.match(phonePattern);
+            if (phoneMatch) {
+                resumeData.contactInfo.phone = phoneMatch[1].trim();
+            } else {
+                // Fallback: try to extract any content between pipes that might be a phone number
+                const allParts = contactText.split('|').map(part => part.trim());
+                // Look for a part that might be a phone number (contains digits)
+                const possiblePhone = allParts.find(part => /\d/.test(part));
+                if (possiblePhone) {
+                    resumeData.contactInfo.phone = possiblePhone;
+                }
+            }
             
             const emailLink = contactSection.querySelector('a[href^="mailto:"]');
             if (emailLink) resumeData.contactInfo.email = emailLink.textContent.trim();
