@@ -3,6 +3,32 @@ import { useLocation, Link } from 'react-router-dom';
 import axios from 'axios'; // Import axios
 import EditableResume from '../components/EditableResume';
 import '../components/EditableResume.css';
+import '../components/ChatMarkdown.css'; // Import ChatMarkdown styles
+
+// Simple function to format text with basic markdown-like syntax
+const formatText = (text) => {
+  if (!text) return '';
+  
+  // Convert line breaks to <br> tags
+  let formattedText = text.replace(/\n/g, '<br>');
+  
+  // Bold: **text** or __text__
+  formattedText = formattedText.replace(/(\*\*|__)(.*?)\1/g, '<strong>$2</strong>');
+  
+  // Italic: *text* or _text_
+  formattedText = formattedText.replace(/(\*|_)(.*?)\1/g, '<em>$2</em>');
+  
+  // Code: `text`
+  formattedText = formattedText.replace(/`(.*?)`/g, '<code>$1</code>');
+  
+  // Lists: - item or * item
+  formattedText = formattedText.replace(/(^|\<br\>)[\-\*] (.*?)(?=(\<br\>|$))/g, '$1<li>$2</li>');
+  
+  // Links: [text](url)
+  formattedText = formattedText.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+  
+  return formattedText;
+};
 
 const ResumeReviewPage = () => {
   const location = useLocation();
@@ -155,9 +181,24 @@ const ResumeReviewPage = () => {
     try {
       console.log('Saving resume with data:', JSON.stringify(updatedResumeData, null, 2));
       
-      // Log education data specifically to debug graduation year issue
+      // Process education data to ensure "Extracted from resume" values are properly handled
       if (updatedResumeData.education && updatedResumeData.education.length > 0) {
-        console.log('Education data being saved:', JSON.stringify(updatedResumeData.education, null, 2));
+        console.log('Education data before processing:', JSON.stringify(updatedResumeData.education, null, 2));
+        
+        // Process each education item to handle placeholder values
+        updatedResumeData.education = updatedResumeData.education.map(edu => {
+          // Create a clean copy without any special fields
+          const cleanedEdu = { ...edu };
+          
+          // Remove any temporary tracking fields
+          if (cleanedEdu._editedGraduationYear !== undefined) {
+            delete cleanedEdu._editedGraduationYear;
+          }
+          
+          return cleanedEdu;
+        });
+        
+        console.log('Education data after processing:', JSON.stringify(updatedResumeData.education, null, 2));
       }
       
       // Update local state immediately to reflect changes in the UI
@@ -421,23 +462,32 @@ const ResumeReviewPage = () => {
               {messages.map((msg, index) => (
                 <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div 
-                    className={`p-2 rounded-lg max-w-[80%] text-sm ${ 
+                    className={`p-2 rounded-lg max-w-[80%] ${ 
                       msg.sender === 'user' ? 'bg-blue-500 text-white' : 
                       msg.sender === 'ai' ? 'bg-gray-200 text-gray-800' : 
                       'bg-yellow-100 text-yellow-800 border border-yellow-300 italic' // System messages
-                    }`}>
-                      {msg.text}
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: formatText(msg.text) }}
+                  >
                   </div>
                 </div>
               ))}
                {isChatLoading && (
                  <div className="flex justify-start">
-                   <div className="p-2 rounded-lg bg-gray-200 text-gray-500 italic text-sm">AI is typing...</div>
+                   <div 
+                     className="p-2 rounded-lg bg-gray-200 text-gray-500 italic text-sm"
+                     dangerouslySetInnerHTML={{ __html: formatText('AI is typing...') }}
+                   >
+                   </div>
                  </div>
                )}
                {chatError && (
                   <div className="flex justify-start">
-                   <div className="p-2 rounded-lg bg-red-100 text-red-700 border border-red-300 text-sm">{chatError}</div>
+                   <div 
+                     className="p-2 rounded-lg bg-red-100 text-red-700 border border-red-300 text-sm"
+                     dangerouslySetInnerHTML={{ __html: formatText(chatError) }}
+                   >
+                   </div>
                  </div>
                )}
               <div ref={chatEndRef} /> {/* Element to scroll to */}

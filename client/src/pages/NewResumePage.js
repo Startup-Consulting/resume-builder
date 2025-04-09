@@ -54,9 +54,13 @@ const NewResumePage = () => {
 
   const handleJobUrlChange = (url) => {
     setJobUrl(url);
-    // Basic URL validation
-    const urlPattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
-    setIsUrlValid(url === '' || urlPattern.test(url));
+    // Use more robust URL validation
+    try {
+      // Empty URL is valid (user hasn't entered anything yet)
+      setIsUrlValid(url === '' || Boolean(new URL(url)));
+    } catch {
+      setIsUrlValid(false);
+    }
   };
 
   const handleJobDescriptionChange = (description) => {

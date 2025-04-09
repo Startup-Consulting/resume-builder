@@ -1,0 +1,143 @@
+/* Styles for markdown content in chat */
+.markdown-chat {
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.markdown-content {
+  font-size: 0.875rem; /* text-sm */
+}
+
+/* Style markdown elements within chat */
+.markdown-content p {
+  margin-bottom: 0.5rem;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul, 
+.markdown-content ol {
+  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 1.5rem;
+}
+
+.markdown-content ul {
+  list-style-type: disc;
+}
+
+.markdown-content ol {
+  list-style-type: decimal;
+}
+
+.markdown-content li {
+  margin-left: 1.5rem;
+  margin-bottom: 0.25rem;
+  list-style-type: disc;
+}
+
+.markdown-content h1, 
+.markdown-content h2, 
+.markdown-content h3, 
+.markdown-content h4 {
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+}
+
+.markdown-content h1 {
+  font-size: 1.25rem;
+}
+
+.markdown-content h2 {
+  font-size: 1.125rem;
+}
+
+.markdown-content h3 {
+  font-size: 1rem;
+}
+
+.markdown-content h4 {
+  font-size: 0.875rem;
+}
+
+.markdown-content code {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.25rem;
+  font-family: monospace;
+  font-size: 0.875rem;
+}
+
+.markdown-content pre {
+  background-color: rgba(0, 0, 0, 0.1);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  overflow-x: auto;
+  margin: 0.5rem 0;
+}
+
+.markdown-content pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.bg-blue-500 .markdown-content a {
+  color: #90cdf4;
+  text-decoration: underline;
+}
+
+.bg-gray-200 .markdown-content a, .bg-yellow-100 .markdown-content a, .bg-red-100 .markdown-content a {
+  color: #3182ce;
+  text-decoration: underline;
+}
+
+.bg-blue-500 .markdown-content code {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.bg-gray-200 .markdown-content code, .bg-yellow-100 .markdown-content code, .bg-red-100 .markdown-content code {
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+/* Table styles */
+.markdown-content table {
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  width: 100%;
+}
+
+.markdown-content th,
+.markdown-content td {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.markdown-content th {
+  background-color: rgba(0, 0, 0, 0.05);
+  font-weight: 600;
+}
+
+/* Blockquote styles */
+.markdown-content blockquote {
+  border-left: 4px solid rgba(0, 0, 0, 0.1);
+  padding-left: 0.75rem;
+  margin: 0.5rem 0;
+  color: rgba(0, 0, 0, 0.7);
+  font-style: italic;
+}
+
+.bg-blue-500 .markdown-content blockquote {
+  border-left-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Add spacing between paragraphs */
+br + br {
+  display: block;
+  content: "";
+  margin-top: 0.5rem;
+}

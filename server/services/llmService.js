@@ -241,6 +241,14 @@ async function handleResumeChat(chatHistory, currentMessage, originalResumeData,
         **Your Task:**
         Respond helpfully and concisely to the user's latest message in the context of the resume and job description. Answer questions about the generated resume, provide suggestions, or acknowledge feedback. Do not regenerate the resume unless explicitly asked via a specific command (which is handled elsewhere). Keep your response conversational.
 
+        **Format Requirements:**
+        Format your response using markdown for better readability:
+        - Use **bold** for emphasis
+        - Use bullet points for lists
+        - Use headings (##, ###) for sections
+        - Use code blocks for examples
+        - Use numbered lists for steps
+
         **AI Response:**
     `;
 

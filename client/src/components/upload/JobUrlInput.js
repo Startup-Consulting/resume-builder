@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-const JobUrlInput = ({ value, onChange, isValid }) => {
+const JobUrlInput = ({ value, onChange, isValid, disabled }) => {
+  const [touched, setTouched] = useState(false);
+  
+  // Only show validation error if the field has been touched, is invalid, and has a value
+  const showError = touched && !isValid && value !== '';
+  
   return (
     <div>
       <label className="block text-gray-700 mb-2" htmlFor="jobUrl">
@@ -9,14 +14,16 @@ const JobUrlInput = ({ value, onChange, isValid }) => {
       <input
         type="text"
         id="jobUrl"
-        className={`input ${!isValid ? 'border-red-500' : ''}`}
+        className={`input ${showError ? 'border-red-500' : ''} ${disabled ? 'bg-gray-100' : ''}`}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setTouched(true)}
         placeholder="https://example.com/job-posting"
+        disabled={disabled}
       />
-      {!isValid && (
+      {showError && (
         <p className="text-red-500 text-sm mt-1">
-          Please enter a valid URL
+          Please enter a valid URL (e.g., https://www.example.com/jobs/12345)
         </p>
       )}
       <p className="text-xs text-gray-500 mt-1">

@@ -57,6 +57,16 @@ const EditableResume = ({
       newData[section][index] = {};
     }
     
+    // Special handling for education graduation year
+    if (section === 'education' && field === 'graduationYear') {
+      console.log(`Updating education[${index}].graduationYear from "${newData[section][index][field]}" to "${value}"`);
+      
+      // If the current value is "Extracted from resume", we need special handling
+      if (newData[section][index][field] === "Extracted from resume") {
+        console.log(`Field was "Extracted from resume", storing edited value`);
+      }
+    }
+    
     // Update the specific field
     newData[section][index][field] = value;
     
@@ -239,40 +249,43 @@ const EditableResume = ({
   const handleSave = () => {
     console.log('EditableResume: handleSave called');
     
-    // Log the current state of education data before validation
-    if (editedData.education && editedData.education.length > 0) {
-      console.log('Education data before save:', JSON.stringify(editedData.education, null, 2));
+    // Process the data before saving to ensure all edits are properly applied
+    const processedData = JSON.parse(JSON.stringify(editedData));
+    
+    // Process education data to handle "Extracted from resume" values
+    if (processedData.education && processedData.education.length > 0) {
+      console.log('Education data before processing:', JSON.stringify(processedData.education, null, 2));
+      
+      // No special processing needed here - we're directly updating the values in handleArrayItemChange
     }
     
     // Validate all fields before saving
     let isValid = true;
     
     // Ensure contactInfo exists
-    if (!editedData.contactInfo) {
-      editedData.contactInfo = {};
+    if (!processedData.contactInfo) {
+      processedData.contactInfo = {};
       isValid = false;
     }
     
     // Validate contact info
     ['name', 'email'].forEach(field => {
-      if (!validateField('contactInfo', field, editedData.contactInfo[field])) {
+      if (!validateField('contactInfo', field, processedData.contactInfo[field])) {
         isValid = false;
       }
     });
     
     // Validate summary
-    if (!validateField('summaryOrObjective', null, editedData.summaryOrObjective)) {
+    if (!validateField('summaryOrObjective', null, processedData.summaryOrObjective)) {
       isValid = false;
     }
     
     if (isValid) {
       console.log('EditableResume: Validation passed, saving data');
+      console.log('Final data being saved:', JSON.stringify(processedData, null, 2));
       
-      // Create a deep copy of the data to prevent reference issues
-      const dataCopy = JSON.parse(JSON.stringify(editedData));
-      
-      // Pass the deep copy to the parent component
-      onSave(dataCopy);
+      // Pass the processed data to the parent component
+      onSave(processedData);
       setHasChanges(false);
     } else {
       console.error('EditableResume: Validation failed, not saving');

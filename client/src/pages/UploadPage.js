@@ -171,6 +171,15 @@ const UploadPage = () => {
     return 'Tailor My Resume';
   };
 
+  const isValidUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   return (
     <div className="max-w-3xl mx-auto bg-white p-8 rounded-lg shadow-xl mb-10">
       <h1 className="text-3xl font-bold text-center text-gray-800 mb-8">Tailor Your Existing Resume</h1>
@@ -191,9 +200,10 @@ const UploadPage = () => {
 
           <div className="mb-2">
             <JobUrlInput 
-              jobUrl={jobUrl} 
+              value={jobUrl} 
               onChange={handleJobUrlChange} 
-              disabled={processStatus.loading || !!jobDescription} 
+              isValid={!jobUrl || isValidUrl(jobUrl)}
+              disabled={processStatus.loading || !!jobDescription}
             />
           </div>
 
